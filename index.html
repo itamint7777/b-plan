@@ -1,0 +1,1227 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>B-Plan</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --row-h: 7.0mm;
+      --row-h-print: 6.8mm;
+      --card: #ffffff;
+      --ink: #172033;
+      --muted: #64748b;
+      --line: #cbd5e1;
+      --brand: #2563eb;
+      --sat: #e0f2fe;
+      --sun: #fee2e2;
+      --holiday: #ffedd5;
+      --vacation: #dcfce7;
+      --white: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.5;
+    }
+    .app {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+    header.app-header {
+      background: linear-gradient(135deg, #1d4ed8, #60a5fa);
+      color: white;
+      border-radius: 18px;
+      padding: 18px 20px;
+      box-shadow: 0 10px 24px rgba(37, 99, 235, .18);
+      margin-bottom: 16px;
+    }
+    header h1 { margin: 0 0 6px; font-size: 1.45rem; }
+    header p { margin: 0; opacity: .92; }
+    header .powered {
+      font-size: .88rem;
+      opacity: .86;
+      letter-spacing: .04em;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .panel, .sheet-wrap {
+      background: var(--card);
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, .06);
+    }
+    .panel { padding: 16px; position: sticky; top: 12px; }
+    .panel h2 { margin: 0 0 12px; font-size: 1.05rem; }
+    .group { border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 12px; }
+    label { display: block; font-weight: 700; font-size: .88rem; margin: 8px 0 4px; }
+    input, select, textarea, button {
+      font: inherit;
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      padding: 9px 10px;
+      background: white;
+    }
+    textarea { min-height: 76px; resize: vertical; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0;
+      font-size: .9rem;
+      font-weight: 600;
+    }
+    .check input { width: auto; }
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .weekday-picker {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      margin: 6px 0 10px;
+    }
+    .weekday-picker .check {
+      min-width: 0;
+      justify-content: center;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 6px 2px;
+      margin: 0;
+      background: #f8fafc;
+      white-space: nowrap;
+      font-size: .86rem;
+    }
+    .weekday-picker .check input {
+      flex: 0 0 auto;
+    }
+    button {
+      border: none;
+      color: white;
+      background: var(--brand);
+      cursor: pointer;
+      font-weight: 700;
+      transition: transform .05s ease, opacity .2s ease;
+    }
+    button:hover { opacity: .92; }
+    button:active { transform: translateY(1px); }
+    button.secondary { background: #475569; }
+    button.good { background: #16a34a; }
+    button.warn { background: #ea580c; }
+    button.danger { background: #dc2626; }
+    .hint {
+      color: var(--muted);
+      font-size: .82rem;
+      margin: 6px 0 0;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+      font-size: .8rem;
+    }
+    .legend span {
+      border: 1px solid #cbd5e1;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: white;
+    }
+    .legend .sat { background: var(--sat); }
+    .legend .sun { background: var(--sun); }
+    .legend .holiday { background: var(--holiday); }
+    .legend .vacation { background: var(--vacation); }
+
+    .sheet-wrap { padding: 14px; overflow: auto; }
+    .sheet {
+      width: 210mm;
+      height: 297mm;
+      background: white;
+      padding: 7mm;
+      margin: 0 auto;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, .06);
+      overflow: hidden;
+    }
+    .sheet-title {
+      text-align: center;
+      font-weight: 900;
+      font-size: 15pt;
+      line-height: 1.15;
+      margin: 0 0 4px;
+      letter-spacing: .02em;
+    }
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 7.8pt;
+      line-height: 1.15;
+      margin-bottom: 3px;
+      color: #334155;
+    }
+    table.schedule {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 7.2pt;
+    }
+    .schedule th, .schedule td {
+      border: 1px solid #334155;
+      padding: 1px 3px;
+      vertical-align: middle;
+      word-break: break-word;
+      height: var(--row-h);
+      line-height: 1.05;
+    }
+    .schedule th {
+      background: #e2e8f0;
+      text-align: center;
+      font-weight: 900;
+    }
+    .schedule td:nth-child(1), .schedule td:nth-child(2) { text-align: center; }
+    .schedule input, .schedule select, .schedule textarea {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      border-radius: 0;
+      padding: 0;
+      font-size: inherit;
+      min-width: 0;
+      font-family: inherit;
+    }
+    .schedule textarea {
+      resize: none;
+      overflow: hidden;
+      line-height: 1.15;
+      min-height: calc(1.15em + 4px);
+      height: auto;
+      max-height: calc(2.3em + 6px);
+      display: block;
+      box-sizing: border-box;
+      overflow-wrap: anywhere;
+      word-break: break-all;
+    }
+    .wrap2 input, .wrap2 select, .wrap2 textarea {
+      white-space: normal;
+      line-height: 1.08;
+    }
+    .schedule td.wrap2 {
+      line-height: 1.08;
+    }
+    .teacher-cell {
+      padding: 0 !important;
+    }
+    .teacher-cell-wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      width: 100%;
+      min-height: 100%;
+    }
+    .teacher-cell-wrap input {
+      border-left: 1px dotted #94a3b8;
+      padding: 1px 2px;
+      min-width: 0;
+      font-size: 6.8pt;
+    }
+    .teacher-cell-wrap input:first-child {
+      border-left: 0;
+    }
+    .schedule input:focus, .schedule select:focus, .schedule textarea:focus {
+      outline: 2px solid #60a5fa;
+      background: white;
+    }
+    tr.sat td { background: var(--sat); }
+    tr.sun td { background: var(--sun); }
+    tr.holiday td { background: var(--holiday); }
+    tr.vacation td { background: var(--vacation); }
+    tr.holiday.vacation td { background: linear-gradient(90deg, var(--holiday), var(--vacation)); }
+    .footer-note {
+      margin-top: 3px;
+      font-size: 7.2pt;
+      color: #475569;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .status {
+      min-height: 1.3em;
+      color: #0f766e;
+      font-size: .86rem;
+      margin-top: 8px;
+    }
+    .hidden-teacher .teacher-col { display: none; }
+    .hidden-teacher col.teacher-col { display: none; }
+
+    @media (max-width: 940px) {
+      .layout { grid-template-columns: 1fr; }
+      .panel { position: static; }
+      .sheet { transform-origin: top left; width: 297mm; }
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: 5mm;
+    }
+    @media print {
+      html, body {
+        width: 210mm;
+        height: 297mm;
+        background: white;
+        overflow: hidden;
+      }
+      .app { max-width: none; padding: 0; }
+      header, .panel { display: none !important; }
+      .layout { display: block; }
+      .sheet-wrap {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+        overflow: visible;
+      }
+      .sheet {
+        width: 200mm;
+        height: 287mm;
+        padding: 0;
+        margin: 0 auto;
+        border: none;
+        box-shadow: none;
+        overflow: hidden;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .sheet-title { font-size: 13.5pt; margin-bottom: 3px; }
+      .meta { font-size: 7.5pt; margin-bottom: 2px; }
+      table.schedule { font-size: 6.8pt; }
+      .schedule th, .schedule td {
+        height: var(--row-h-print);
+        padding: 0.5px 2px;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .footer-note { font-size: 6.8pt; margin-top: 2px; }
+      .schedule input, .schedule select { color: black; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1>B-Plan</h1>
+      <p>部活動予定を、もっとかんたんに。<br><span class="powered">Powered by itamint</span></p>
+    </header>
+
+    <div class="layout">
+      <aside class="panel">
+        <h2>基本設定</h2>
+        <label for="clubName">部活動名</label>
+        <input id="clubName" value="男子バスケットボール" placeholder="例：男子バスケットボール" />
+
+        <div class="row">
+          <div>
+            <label for="year">年</label>
+            <input id="year" type="number" min="2020" max="2100" />
+          </div>
+          <div>
+            <label for="month">月</label>
+            <select id="month"></select>
+          </div>
+        </div>
+
+        <label for="schoolName">学校名・発行者メモ</label>
+        <input id="schoolName" value="鴨川市立安房東中学校" />
+
+        <label class="check">
+          <input id="hideTeacher" type="checkbox" />
+          指導教員欄を非表示にする
+        </label>
+
+        <div class="legend">
+          <span class="sat">土曜</span>
+          <span class="sun">日曜</span>
+          <span class="holiday">祝日</span>
+          <span class="vacation">長期休業</span>
+        </div>
+
+        <div class="group">
+          <h2>長期休業日設定</h2>
+          <p class="hint">例：夏季休業 2026-07-20 ～ 2026-08-31。複数設定できます。</p>
+          <div class="row-3">
+            <div><label for="vacStart">開始</label><input id="vacStart" type="date"></div>
+            <div><label for="vacEnd">終了</label><input id="vacEnd" type="date"></div>
+            <div><label>&nbsp;</label><button id="addVacation" class="good">追加</button></div>
+          </div>
+          <textarea id="vacationList" placeholder="2026-07-20,2026-08-31,夏季休業"></textarea>
+          <p class="hint">形式：開始日,終了日,名称。1行に1件。</p>
+        </div>
+
+        <div class="group">
+          <h2>交通手段の登録</h2>
+          <p class="hint">1行に1つずつ入力します。一括入力ではこの一覧から選べます。表の交通手段欄は2行入力できます。</p>
+          <textarea id="transportOptions">公用車
+JR
+路線バス
+借り上げバス</textarea>
+          <button id="updateTransportOptions" class="secondary" style="margin-top:8px;">交通手段リストを反映</button>
+        </div>
+
+        <div class="group">
+          <h2>一括入力</h2>
+          <p class="hint">反映したい曜日を選んでから押してください。複数曜日をまとめて指定できます。</p>
+          <div class="weekday-picker">
+            <label class="check"><input type="checkbox" class="weekdayBulk" value="1">月</label>
+            <label class="check"><input type="checkbox" class="weekdayBulk" value="2">火</label>
+            <label class="check"><input type="checkbox" class="weekdayBulk" value="3">水</label>
+            <label class="check"><input type="checkbox" class="weekdayBulk" value="4">木</label>
+            <label class="check"><input type="checkbox" class="weekdayBulk" value="5">金</label>
+            <label class="check"><input type="checkbox" class="weekdayBulk" value="6" checked>土</label>
+            <label class="check"><input type="checkbox" class="weekdayBulk" value="0" checked>日</label>
+          </div>
+          <div class="row">
+            <div><label for="bulkStart">開始</label><input id="bulkStart" type="time" value="08:30"></div>
+            <div><label for="bulkEnd">終了</label><input id="bulkEnd" type="time" value="12:00"></div>
+          </div>
+          <label for="bulkPlace">場所</label>
+          <input id="bulkPlace" value="体育館" />
+          <label for="bulkTransport">交通手段</label>
+          <select id="bulkTransport"></select>
+          <label>指導教員（最大3名）</label>
+          <div class="row-3">
+            <input id="bulkTeacher1" value="" placeholder="教員1">
+            <input id="bulkTeacher2" value="" placeholder="教員2">
+            <input id="bulkTeacher3" value="" placeholder="教員3">
+          </div>
+          <div class="buttons">
+            <button id="applySelectedWeekdays" class="secondary">選択曜日に反映</button>
+            <button id="applyAll" class="secondary">全日に反映</button>
+          </div>
+        </div>
+
+        <div class="group">
+          <h2>出力・保存</h2>
+          <div class="buttons">
+            <button id="saveLocal" class="good">端末保存</button>
+            <button id="loadLocal" class="secondary">読込</button>
+            <button id="downloadPng">PNG出力</button>
+            <button id="printPdf" class="warn">PDF/印刷</button>
+            <button id="downloadCsv">CSV出力</button>
+            <button id="downloadIcs">TimeTree用ICS</button>
+            <button id="downloadJson" class="secondary">JSON保存</button>
+            <button id="clearRows" class="danger">表をクリア</button>
+          </div>
+          <label for="savedMonthSelect">保存済み予定を開く</label>
+          <select id="savedMonthSelect">
+            <option value="">保存済みの月を選択</option>
+          </select>
+          <p class="hint">「端末保存」で、同じ年の1月〜12月分をこのブラウザに保存できます。保存後は再度HTMLを開いても読み込めます。</p>
+          <p class="hint">OneDriveへは、出力したPNG/PDF/CSV/ICS/JSONをOneDriveフォルダに保存してください。Microsoftアカウント直結は、Azureアプリ登録後に追加可能です。</p>
+          <div id="status" class="status"></div>
+        </div>
+      </aside>
+
+      <main class="sheet-wrap">
+        <section id="sheet" class="sheet">
+          <h1 id="title" class="sheet-title"></h1>
+          <div class="meta">
+            <span id="schoolMeta"></span>
+            <span id="createdMeta"></span>
+          </div>
+          <table id="scheduleTable" class="schedule">
+            <colgroup>
+              <col style="width:6%">
+              <col style="width:6%">
+              <col style="width:7%">
+              <col style="width:7%">
+              <col style="width:14%">
+              <col style="width:14%">
+              <col style="width:28%">
+              <col class="teacher-col" style="width:18%">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>日付</th>
+                <th>曜日</th>
+                <th>開始</th>
+                <th>終了</th>
+                <th>場所</th>
+                <th>交通手段</th>
+                <th>活動内容</th>
+                <th class="teacher-col">指導教員</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+          <div class="footer-note">
+            <span>※予定は変更になる場合があります。変更時は別途連絡します。</span>
+            <span></span>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const els = {
+      clubName: document.getElementById('clubName'),
+      year: document.getElementById('year'),
+      month: document.getElementById('month'),
+      schoolName: document.getElementById('schoolName'),
+      hideTeacher: document.getElementById('hideTeacher'),
+      title: document.getElementById('title'),
+      schoolMeta: document.getElementById('schoolMeta'),
+      createdMeta: document.getElementById('createdMeta'),
+      vacMeta: document.getElementById('vacMeta'),
+      tbody: document.getElementById('tbody'),
+      sheet: document.getElementById('sheet'),
+      vacationList: document.getElementById('vacationList'),
+      transportOptions: document.getElementById('transportOptions'),
+      status: document.getElementById('status'),
+      savedMonthSelect: document.getElementById('savedMonthSelect')
+    };
+
+    const weekdays = ['日','月','火','水','木','金','土'];
+    const defaultVacations = [
+      '2026-07-20,2026-08-31,夏季休業',
+      '2026-12-24,2027-01-06,冬季休業',
+      '2027-03-25,2027-04-05,春季休業'
+    ];
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function ymd(date) { return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`; }
+    function showStatus(msg) {
+      els.status.textContent = msg;
+      setTimeout(() => { if (els.status.textContent === msg) els.status.textContent = ''; }, 3500);
+    }
+
+    function mmToPx(mm) {
+      return mm * 96 / 25.4;
+    }
+
+    function fitTableLayout() {
+      const sheet = els.sheet;
+      const table = document.getElementById('scheduleTable');
+      const title = els.title;
+      const meta = sheet ? sheet.querySelector('.meta') : null;
+      const footer = sheet ? sheet.querySelector('.footer-note') : null;
+      const thead = table ? table.querySelector('thead') : null;
+      const rows = table ? [...table.querySelectorAll('tbody tr')] : [];
+      if (!sheet || !table || !title || !meta || !footer || !thead || rows.length === 0) return;
+
+      const sheetStyle = getComputedStyle(sheet);
+      const padTop = parseFloat(sheetStyle.paddingTop) || 0;
+      const padBottom = parseFloat(sheetStyle.paddingBottom) || 0;
+      const innerHeight = sheet.clientHeight - padTop - padBottom;
+
+      const titleH = title.getBoundingClientRect().height;
+      const metaH = meta.getBoundingClientRect().height;
+      const footerH = footer.getBoundingClientRect().height;
+      const theadH = thead.getBoundingClientRect().height;
+
+      const bottomBlank = mmToPx(20);
+      const extraGap = 4;
+      const available = innerHeight - titleH - metaH - footerH - theadH - bottomBlank - extraGap;
+      const rowHpx = Math.max(28, available / rows.length);
+
+      sheet.style.setProperty('--row-h', `${rowHpx}px`);
+      sheet.style.setProperty('--row-h-print', `${(rowHpx * 25.4 / 96).toFixed(2)}mm`);
+    }
+
+    function autoResizeTextarea(el) {
+      if (!el) return;
+      const style = getComputedStyle(el);
+      const lineHeight = parseFloat(style.lineHeight) || 14;
+      el.rows = 1;
+      el.style.height = '0px';
+      const neededRows = Math.min(2, Math.max(1, Math.ceil(el.scrollHeight / lineHeight)));
+      el.rows = neededRows;
+      el.style.height = `${neededRows * lineHeight + 4}px`;
+    }
+
+    function refreshTextareas() {
+      document.querySelectorAll('#tbody textarea').forEach(el => autoResizeTextarea(el));
+    }
+
+    function initMonthSelect() {
+      for (let m = 1; m <= 12; m++) {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = `${m}月`;
+        els.month.appendChild(opt);
+      }
+      const now = new Date();
+      els.year.value = now.getFullYear();
+      els.month.value = 7;
+      els.vacationList.value = defaultVacations.join('\n');
+    }
+
+    function nthMonday(year, month, nth) {
+      let count = 0;
+      for (let d = 1; d <= 31; d++) {
+        const date = new Date(year, month - 1, d);
+        if (date.getMonth() !== month - 1) break;
+        if (date.getDay() === 1) {
+          count++;
+          if (count === nth) return d;
+        }
+      }
+      return null;
+    }
+
+    function springEquinoxDay(year) {
+      return Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+    }
+    function autumnEquinoxDay(year) {
+      return Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+    }
+
+    function baseJapaneseHolidays(year) {
+      const list = [];
+      const add = (m, d, name) => list.push({ date: `${year}-${pad(m)}-${pad(d)}`, name });
+      add(1, 1, '元日');
+      add(1, nthMonday(year, 1, 2), '成人の日');
+      add(2, 11, '建国記念の日');
+      add(2, 23, '天皇誕生日');
+      add(3, springEquinoxDay(year), '春分の日');
+      add(4, 29, '昭和の日');
+      add(5, 3, '憲法記念日');
+      add(5, 4, 'みどりの日');
+      add(5, 5, 'こどもの日');
+      add(7, nthMonday(year, 7, 3), '海の日');
+      add(8, 11, '山の日');
+      add(9, nthMonday(year, 9, 3), '敬老の日');
+      add(9, autumnEquinoxDay(year), '秋分の日');
+      add(10, nthMonday(year, 10, 2), 'スポーツの日');
+      add(11, 3, '文化の日');
+      add(11, 23, '勤労感謝の日');
+      return list.filter(h => h.date.indexOf('null') === -1);
+    }
+
+    function japaneseHolidays(year) {
+      const candidates = [...baseJapaneseHolidays(year - 1), ...baseJapaneseHolidays(year), ...baseJapaneseHolidays(year + 1)]
+        .sort((a,b) => a.date.localeCompare(b.date));
+      const map = new Map();
+      candidates.forEach(h => map.set(h.date, h.name));
+
+      // 振替休日：祝日が日曜日の場合、次の平日へ
+      candidates.forEach(h => {
+        const date = new Date(h.date + 'T00:00:00');
+        if (date.getDay() === 0) {
+          let sub = new Date(date);
+          do {
+            sub.setDate(sub.getDate() + 1);
+          } while (map.has(ymd(sub)) || sub.getDay() === 0);
+          map.set(ymd(sub), '振替休日');
+        }
+      });
+
+      // 国民の休日：祝日と祝日に挟まれた平日
+      const start = new Date(`${year}-01-01T00:00:00`);
+      const end = new Date(`${year}-12-31T00:00:00`);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const current = ymd(d);
+        if (map.has(current) || d.getDay() === 0) continue;
+        const prev = new Date(d); prev.setDate(prev.getDate() - 1);
+        const next = new Date(d); next.setDate(next.getDate() + 1);
+        if (map.has(ymd(prev)) && map.has(ymd(next))) map.set(current, '国民の休日');
+      }
+      return map;
+    }
+
+    function getTransportOptions() {
+      const lines = (els.transportOptions?.value || '').split('\n').map(v => v.trim()).filter(Boolean);
+      return [...new Set(lines)];
+    }
+
+    function transportSelectHtml(value = '') {
+      const options = getTransportOptions();
+      const all = value && !options.includes(value) ? [value, ...options] : options;
+      return `<select data-field="transport">
+        <option value=""></option>
+        ${all.map(opt => `<option value="${escapeHtml(opt)}" ${opt === value ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
+      </select>`;
+    }
+
+    function refreshTransportSelects() {
+      const bulk = document.getElementById('bulkTransport');
+      if (bulk) {
+        const current = bulk.value;
+        bulk.innerHTML = '<option value=""></option>' + getTransportOptions().map(opt => `<option value="${escapeHtml(opt)}">${escapeHtml(opt)}</option>`).join('');
+        if (getTransportOptions().includes(current)) bulk.value = current;
+      }
+      autosave();
+    }
+
+    function parseVacations() {
+      return els.vacationList.value.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+        const [start, end, name = '長期休業'] = line.split(',').map(s => s.trim());
+        return { start, end, name };
+      }).filter(v => v.start && v.end);
+    }
+
+    function inVacation(dateStr) {
+      const vac = parseVacations().find(v => dateStr >= v.start && dateStr <= v.end);
+      return vac ? vac.name : '';
+    }
+
+    function getRowData() {
+      const data = {};
+      document.querySelectorAll('#tbody tr').forEach(tr => {
+        const date = tr.dataset.date;
+        data[date] = {};
+        tr.querySelectorAll('input, select, textarea').forEach(input => data[date][input.dataset.field] = input.value);
+      });
+      return data;
+    }
+
+    function setRowInputs(date, values = {}) {
+      const tr = document.querySelector(`tr[data-date="${date}"]`);
+      if (!tr) return;
+      Object.entries(values).forEach(([field, value]) => {
+        const input = tr.querySelector(`input[data-field="${field}"]`);
+        if (input) input.value = value;
+      });
+    }
+
+    function buildTable(keepData = true) {
+      const oldData = keepData ? getRowData() : {};
+      const year = Number(els.year.value);
+      const month = Number(els.month.value);
+      const club = els.clubName.value || '〇〇';
+      els.title.textContent = `${club}部${month}月部活動予定表`;
+      els.schoolMeta.textContent = els.schoolName.value;
+      els.createdMeta.textContent = `作成：${ymd(new Date())}`;
+      const vacNames = [...new Set(parseVacations().map(v => v.name))];
+      if (els.vacMeta) els.vacMeta.textContent = '';
+
+      els.tbody.innerHTML = '';
+      const days = new Date(year, month, 0).getDate();
+      const holidayMap = japaneseHolidays(year);
+
+      for (let day = 1; day <= days; day++) {
+        const date = new Date(year, month - 1, day);
+        const dateStr = ymd(date);
+        const week = weekdays[date.getDay()];
+        const holidayName = holidayMap.get(dateStr) || '';
+        const vacationName = inVacation(dateStr);
+
+        const tr = document.createElement('tr');
+        tr.dataset.date = dateStr;
+        if (date.getDay() === 6) tr.classList.add('sat');
+        if (date.getDay() === 0) tr.classList.add('sun');
+        if (holidayName) tr.classList.add('holiday');
+        if (vacationName) tr.classList.add('vacation');
+
+        const noteDefault = holidayName ? holidayName : (vacationName ? vacationName : '');
+        const row = oldData[dateStr] || {};
+        tr.innerHTML = `
+          <td>${day}</td>
+          <td>${week}</td>
+          <td><input data-field="start" value="${escapeHtml(row.start || '')}" placeholder="8:30"></td>
+          <td><input data-field="end" value="${escapeHtml(row.end || '')}" placeholder="12:00"></td>
+          <td class="wrap2"><textarea data-field="place" rows="1" wrap="soft" placeholder=""></textarea></td>
+          <td class="wrap2"><textarea data-field="transport" rows="1" wrap="soft" placeholder=""></textarea></td>
+          <td class="wrap2"><textarea data-field="note" rows="1" wrap="soft" placeholder=""></textarea></td>
+          <td class="teacher-col teacher-cell">
+            <div class="teacher-cell-wrap">
+              <input data-field="teacher1" value="${escapeHtml(row.teacher1 || row.teacher || '')}" placeholder="教員1">
+              <input data-field="teacher2" value="${escapeHtml(row.teacher2 || '')}" placeholder="教員2">
+              <input data-field="teacher3" value="${escapeHtml(row.teacher3 || '')}" placeholder="教員3">
+            </div>
+          </td>
+        `;
+        const placeEl = tr.querySelector('[data-field="place"]');
+        const transportEl = tr.querySelector('[data-field="transport"]');
+        const noteEl = tr.querySelector('[data-field="note"]');
+        if (placeEl) {
+          placeEl.value = row.place || '';
+          autoResizeTextarea(placeEl);
+        }
+        if (transportEl) {
+          transportEl.value = row.transport || '';
+          autoResizeTextarea(transportEl);
+        }
+        if (noteEl) {
+          noteEl.value = row.note || noteDefault;
+          autoResizeTextarea(noteEl);
+        }
+        els.tbody.appendChild(tr);
+      }
+      updateTeacherVisibility();
+      requestAnimationFrame(() => {
+        refreshTextareas();
+        fitTableLayout();
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    }
+
+    function updateTeacherVisibility() {
+      els.sheet.classList.toggle('hidden-teacher', els.hideTeacher.checked);
+    }
+
+    function applyBulk(mode) {
+      const selectedDays = [...document.querySelectorAll('.weekdayBulk:checked')].map(cb => Number(cb.value));
+      const values = {
+        start: document.getElementById('bulkStart').value,
+        end: document.getElementById('bulkEnd').value,
+        place: document.getElementById('bulkPlace').value,
+        transport: document.getElementById('bulkTransport').value,
+        teacher1: document.getElementById('bulkTeacher1').value,
+        teacher2: document.getElementById('bulkTeacher2').value,
+        teacher3: document.getElementById('bulkTeacher3').value
+      };
+      if (mode === 'selected' && selectedDays.length === 0) {
+        return showStatus('反映する曜日を選択してください。');
+      }
+      document.querySelectorAll('#tbody tr').forEach(tr => {
+        const date = new Date(tr.dataset.date + 'T00:00:00');
+        if (mode === 'all' || selectedDays.includes(date.getDay())) {
+          Object.entries(values).forEach(([field, value]) => {
+            const input = tr.querySelector(`[data-field="${field}"]`);
+            if (input && value !== '') input.value = value;
+          });
+        }
+      });
+      autosave();
+      showStatus(mode === 'all' ? '全日に一括反映しました。' : '選択した曜日に一括反映しました。');
+    }
+
+    function collectData() {
+      return {
+        version: '1.0',
+        clubName: els.clubName.value,
+        year: Number(els.year.value),
+        month: Number(els.month.value),
+        schoolName: els.schoolName.value,
+        hideTeacher: els.hideTeacher.checked,
+        vacationList: els.vacationList.value,
+        transportOptions: els.transportOptions.value,
+        rows: getRowData()
+      };
+    }
+
+    function restoreData(data) {
+      if (!data) return;
+      els.clubName.value = data.clubName || els.clubName.value;
+      els.year.value = data.year || els.year.value;
+      els.month.value = data.month || els.month.value;
+      els.schoolName.value = data.schoolName || els.schoolName.value;
+      els.hideTeacher.checked = !!data.hideTeacher;
+      els.vacationList.value = data.vacationList || els.vacationList.value;
+      if (data.transportOptions) els.transportOptions.value = data.transportOptions;
+      buildTable(false);
+      if (data.rows) Object.entries(data.rows).forEach(([date, values]) => setRowInputs(date, values));
+      updateTeacherVisibility();
+      updateSavedMonthSelect();
+      requestAnimationFrame(() => {
+        refreshTextareas();
+        fitTableLayout();
+      });
+    }
+
+    function storageKey(year = els.year.value, club = els.clubName.value) {
+      return `bukatsu-schedule-year-${year}-${club}`;
+    }
+
+    function readYearArchive(year = els.year.value, club = els.clubName.value) {
+      try {
+        return JSON.parse(localStorage.getItem(storageKey(year, club)) || '{}');
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function writeYearArchive(archive, year = els.year.value, club = els.clubName.value) {
+      localStorage.setItem(storageKey(year, club), JSON.stringify(archive));
+    }
+
+    function saveCurrentMonthToArchive(silent = true) {
+      try {
+        const data = collectData();
+        const archive = readYearArchive(data.year, data.clubName);
+        archive.version = '2.1';
+        archive.clubName = data.clubName;
+        archive.year = data.year;
+        archive.schoolName = data.schoolName;
+        archive.hideTeacher = data.hideTeacher;
+        archive.vacationList = data.vacationList;
+        archive.transportOptions = data.transportOptions;
+        archive.months = archive.months || {};
+        archive.months[String(data.month)] = data;
+        archive.updatedAt = new Date().toISOString();
+        writeYearArchive(archive, data.year, data.clubName);
+        updateSavedMonthSelect();
+        if (!silent) showStatus(`${data.year}年${data.month}月分を保存しました。1年分の保存枠に追加されています。`);
+      } catch (e) {
+        if (!silent) showStatus('保存に失敗しました。ブラウザの保存容量や設定を確認してください。');
+      }
+    }
+
+    function autosave() {
+      saveCurrentMonthToArchive(true);
+    }
+
+    function saveLocal() {
+      saveCurrentMonthToArchive(false);
+    }
+
+    function loadLocal(monthValue = els.month.value) {
+      const archive = readYearArchive(els.year.value, els.clubName.value);
+      const data = archive.months && archive.months[String(monthValue)];
+      if (!data) return showStatus('この年・部活動名の保存データは見つかりません。');
+      restoreData(data);
+      showStatus(`${data.year}年${data.month}月分を読み込みました。`);
+    }
+
+    function updateSavedMonthSelect() {
+      if (!els.savedMonthSelect) return;
+      const archive = readYearArchive(els.year.value, els.clubName.value);
+      const months = archive.months ? Object.keys(archive.months).map(Number).sort((a,b) => a-b) : [];
+      const current = els.savedMonthSelect.value;
+      els.savedMonthSelect.innerHTML = '<option value="">保存済みの月を選択</option>' +
+        months.map(m => `<option value="${m}">${els.year.value}年${m}月</option>`).join('');
+      if (months.map(String).includes(current)) els.savedMonthSelect.value = current;
+    }
+
+    function loadSavedMonthIfExists() {
+      const archive = readYearArchive(els.year.value, els.clubName.value);
+      const data = archive.months && archive.months[String(els.month.value)];
+      if (data) {
+        restoreData(data);
+        showStatus(`${data.year}年${data.month}月分の保存データを自動で読み込みました。`);
+      }
+      updateSavedMonthSelect();
+    }
+
+    function download(filename, content, type) {
+      const blob = content instanceof Blob ? content : new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function downloadJson() {
+      const name = `${els.clubName.value}_${els.year.value}-${pad(els.month.value)}_予定表.json`;
+      download(name, JSON.stringify(collectData(), null, 2), 'application/json');
+    }
+
+    function csvCell(v) {
+      return '"' + String(v || '').replace(/"/g, '""') + '"';
+    }
+
+    function downloadCsv() {
+      const rows = [['日付','曜日','開始時間','終了時間','場所','交通手段','活動内容','指導教員1','指導教員2','指導教員3']];
+      document.querySelectorAll('#tbody tr').forEach(tr => {
+        const date = tr.dataset.date;
+        const inputs = Object.fromEntries([...tr.querySelectorAll('input')].map(i => [i.dataset.field, i.value]));
+        rows.push([date, tr.children[1].textContent, inputs.start, inputs.end, inputs.place, inputs.transport, inputs.note, inputs.teacher1, inputs.teacher2, inputs.teacher3]);
+      });
+      const csv = '\ufeff' + rows.map(r => r.map(csvCell).join(',')).join('\n');
+      download(`${els.clubName.value}_${els.year.value}-${pad(els.month.value)}_予定表.csv`, csv, 'text/csv;charset=utf-8');
+    }
+
+    function toIcsDateTime(dateStr, timeStr) {
+      const t = timeStr || '00:00';
+      return dateStr.replaceAll('-', '') + 'T' + t.replace(':','') + '00';
+    }
+
+    function foldIcsLine(line) {
+      const out = [];
+      while (line.length > 72) {
+        out.push(line.slice(0, 72));
+        line = ' ' + line.slice(72);
+      }
+      out.push(line);
+      return out.join('\r\n');
+    }
+
+    function escapeIcs(s) {
+      return String(s || '').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');
+    }
+
+    function downloadIcs() {
+      const now = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Bukatsu Schedule App//JP','CALSCALE:GREGORIAN','METHOD:PUBLISH'];
+      document.querySelectorAll('#tbody tr').forEach(tr => {
+        const inputs = Object.fromEntries([...tr.querySelectorAll('input')].map(i => [i.dataset.field, i.value]));
+        if (!inputs.start && !inputs.end && !inputs.place && !inputs.note) return;
+        const date = tr.dataset.date;
+        const start = toIcsDateTime(date, inputs.start || '09:00');
+        const end = toIcsDateTime(date, inputs.end || inputs.start || '10:00');
+        const summary = `${els.clubName.value}部 活動`;
+        const desc = [
+          inputs.note ? `活動内容：${inputs.note}` : '',
+          inputs.transport ? `交通手段：${inputs.transport}` : '',
+          [inputs.teacher1, inputs.teacher2, inputs.teacher3].filter(Boolean).length ? `指導教員：${[inputs.teacher1, inputs.teacher2, inputs.teacher3].filter(Boolean).join('・')}` : ''
+        ].filter(Boolean).join('\\n');
+        lines.push('BEGIN:VEVENT');
+        lines.push(`UID:${date}-${Math.random().toString(36).slice(2)}@bukatsu-schedule`);
+        lines.push(`DTSTAMP:${now}`);
+        lines.push(`DTSTART:${start}`);
+        lines.push(`DTEND:${end}`);
+        lines.push(foldIcsLine(`SUMMARY:${escapeIcs(summary)}`));
+        if (inputs.place) lines.push(foldIcsLine(`LOCATION:${escapeIcs(inputs.place)}`));
+        if (desc) lines.push(foldIcsLine(`DESCRIPTION:${escapeIcs(desc)}`));
+        lines.push('END:VEVENT');
+      });
+      lines.push('END:VCALENDAR');
+      download(`${els.clubName.value}_${els.year.value}-${pad(els.month.value)}_TimeTree用.ics`, lines.join('\r\n'), 'text/calendar;charset=utf-8');
+    }
+
+    function drawTextFit(ctx, text, x, y, w, h, font, align = 'left', bold = false) {
+      text = String(text || '');
+      ctx.save();
+      ctx.font = font;
+      ctx.fillStyle = '#172033';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = align;
+      const pad = 8;
+      let sizeMatch = font.match(/(\d+)px/);
+      let size = sizeMatch ? Number(sizeMatch[1]) : 24;
+      let useFont = font;
+      while (ctx.measureText(text).width > Math.max(10, w - pad * 2) && size > 11) {
+        size -= 1;
+        useFont = font.replace(/(\d+)px/, `${size}px`);
+        ctx.font = useFont;
+      }
+      let tx = x + pad;
+      if (align === 'center') tx = x + w / 2;
+      if (align === 'right') tx = x + w - pad;
+      ctx.fillText(text, tx, y + h / 2);
+      ctx.restore();
+    }
+
+    function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+      text = String(text || '');
+      const chars = [...text];
+      let line = '';
+      const lines = [];
+      for (const ch of chars) {
+        const test = line + ch;
+        if (ctx.measureText(test).width > maxWidth && line) {
+          lines.push(line);
+          line = ch;
+          if (lines.length >= maxLines) break;
+        } else {
+          line = test;
+        }
+      }
+      if (lines.length < maxLines && line) lines.push(line);
+      lines.slice(0, maxLines).forEach((ln, i) => ctx.fillText(ln, x, y + i * lineHeight));
+    }
+
+    function getScheduleRowsForExport() {
+      return [...document.querySelectorAll('#tbody tr')].map(tr => {
+        const inputs = Object.fromEntries([...tr.querySelectorAll('input, select, textarea')].map(i => [i.dataset.field, i.value]));
+        return {
+          day: tr.children[0].textContent,
+          week: tr.children[1].textContent,
+          start: inputs.start || '',
+          end: inputs.end || '',
+          place: inputs.place || '',
+          transport: inputs.transport || '',
+          note: inputs.note || '',
+          teachers: [inputs.teacher1, inputs.teacher2, inputs.teacher3].filter(Boolean).join('・'),
+          cls: [...tr.classList]
+        };
+      });
+    }
+
+    function rowBgColor(cls) {
+      if (cls.includes('holiday')) return '#ffedd5';
+      if (cls.includes('vacation')) return '#dcfce7';
+      if (cls.includes('sun')) return '#fee2e2';
+      if (cls.includes('sat')) return '#e0f2fe';
+      return '#ffffff';
+    }
+
+    async function downloadPng() {
+      try {
+        const scale = 2;
+        const width = 1240;   // A4 portrait 150dpi
+        const height = 1754;
+        const canvas = document.createElement('canvas');
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(scale, scale);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+
+        const margin = 34;
+        const titleH = 38;
+        const metaH = 20;
+        const footerH = 24;
+        const bottomBlank = Math.round(20 / 25.4 * 150);
+        const tableX = margin;
+        const tableY = margin + titleH + metaH;
+        const tableW = width - margin * 2;
+        const rows = getScheduleRowsForExport();
+        const headerH = 28;
+        const rowH = Math.max(28, Math.floor((height - tableY - footerH - bottomBlank - margin - headerH) / rows.length));
+        const tableH = headerH + rowH * rows.length;
+
+        ctx.fillStyle = '#172033';
+        ctx.font = 'bold 28px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(els.title.textContent, width / 2, margin + 18);
+
+        ctx.font = '14px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(els.schoolMeta.textContent || '', margin, margin + titleH + 6);
+        ctx.textAlign = 'right';
+        ctx.fillText(els.createdMeta.textContent || '', width - margin, margin + titleH + 6);
+
+        const hideTeacher = els.hideTeacher.checked;
+        const headers = hideTeacher
+          ? ['日付','曜日','開始','終了','場所','交通手段','活動内容']
+          : ['日付','曜日','開始','終了','場所','交通手段','活動内容','指導教員'];
+        const colRatios = hideTeacher
+          ? [0.07,0.07,0.08,0.08,0.16,0.16,0.38]
+          : [0.06,0.06,0.07,0.07,0.14,0.14,0.28,0.18];
+        const colWs = colRatios.map(r => tableW * r);
+        const colXs = [];
+        colWs.reduce((acc, w) => { colXs.push(acc); return acc + w; }, tableX);
+
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1.5;
+
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(tableX, tableY, tableW, headerH);
+        ctx.strokeRect(tableX, tableY, tableW, headerH);
+        headers.forEach((h, i) => {
+          ctx.strokeRect(colXs[i], tableY, colWs[i], headerH);
+          drawTextFit(ctx, h, colXs[i], tableY, colWs[i], headerH, 'bold 14px "Noto Sans JP", sans-serif', 'center');
+        });
+
+        rows.forEach((r, ri) => {
+          const y = tableY + headerH + ri * rowH;
+          ctx.fillStyle = rowBgColor(r.cls);
+          ctx.fillRect(tableX, y, tableW, rowH);
+          ctx.strokeStyle = '#334155';
+          ctx.strokeRect(tableX, y, tableW, rowH);
+
+          const vals = hideTeacher
+            ? [r.day, r.week, r.start, r.end, r.place, r.transport, r.note]
+            : [r.day, r.week, r.start, r.end, r.place, r.transport, r.note, r.teachers];
+
+          vals.forEach((v, i) => {
+            ctx.strokeRect(colXs[i], y, colWs[i], rowH);
+            ctx.fillStyle = '#172033';
+            ctx.textBaseline = 'middle';
+            if (i === 4 || i === 5 || i === 6) {
+              ctx.font = '14px "Noto Sans JP", sans-serif';
+              ctx.textAlign = 'left';
+              ctx.textBaseline = 'alphabetic';
+              wrapText(ctx, v, colXs[i] + 6, y + rowH / 2 - 6, colWs[i] - 10, 14, 2);
+            } else {
+              drawTextFit(ctx, v, colXs[i], y, colWs[i], rowH, '14px "Noto Sans JP", sans-serif', (i <= 3 ? 'center' : 'left'));
+            }
+          });
+        });
+
+        ctx.fillStyle = '#475569';
+        ctx.font = '14px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('※予定は変更になる場合があります。変更時は別途連絡します。', margin, height - bottomBlank + 10);
+
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error('PNG変換に失敗しました。');
+        download(`${els.clubName.value}_${els.year.value}-${pad(els.month.value)}_予定表.png`, blob, 'image/png');
+        showStatus('PNGを出力しました。');
+      } catch (e) {
+        console.error(e);
+        showStatus('PNG出力に失敗しました。ブラウザを更新して再度試してください。');
+      }
+    }
+
+    function clearRows() {
+      if (!confirm('表の入力内容をクリアしますか？')) return;
+      document.querySelectorAll('#tbody input, #tbody select, #tbody textarea').forEach(i => i.value = '');
+      autosave();
+      showStatus('表をクリアしました。');
+    }
+
+    document.addEventListener('input', e => {
+      if (['schoolName','vacationList'].includes(e.target.id)) buildTable(true);
+      if (e.target.id === 'clubName' || e.target.id === 'year') {
+        buildTable(true);
+        updateSavedMonthSelect();
+      }
+      if (e.target.id === 'transportOptions') refreshTransportSelects();
+      if (e.target.matches('#tbody textarea')) {
+        autoResizeTextarea(e.target);
+        requestAnimationFrame(() => { refreshTextareas(); fitTableLayout(); });
+      }
+      if (e.target.closest('#tbody')) autosave();
+    });
+    document.addEventListener('change', e => {
+      if (e.target.id === 'hideTeacher') { updateTeacherVisibility(); requestAnimationFrame(() => { refreshTextareas(); fitTableLayout(); }); autosave(); }
+      if (e.target.id === 'month') {
+        buildTable(false);
+        loadSavedMonthIfExists();
+      }
+      if (e.target.id === 'savedMonthSelect' && e.target.value) {
+        els.month.value = e.target.value;
+        buildTable(false);
+        loadLocal(e.target.value);
+      }
+    });
+
+    document.getElementById('addVacation').addEventListener('click', () => {
+      const s = document.getElementById('vacStart').value;
+      const e = document.getElementById('vacEnd').value;
+      if (!s || !e) return showStatus('開始日と終了日を入力してください。');
+      const line = `${s},${e},長期休業`;
+      els.vacationList.value = els.vacationList.value.trim() ? els.vacationList.value.trim() + '\n' + line : line;
+      buildTable(true);
+      showStatus('長期休業日を追加しました。');
+    });
+    document.getElementById('updateTransportOptions').addEventListener('click', () => {
+      refreshTransportSelects();
+      showStatus('交通手段リストを反映しました。');
+    });
+    document.getElementById('applySelectedWeekdays').addEventListener('click', () => applyBulk('selected'));
+    document.getElementById('applyAll').addEventListener('click', () => applyBulk('all'));
+    document.getElementById('saveLocal').addEventListener('click', saveLocal);
+    document.getElementById('loadLocal').addEventListener('click', loadLocal);
+    document.getElementById('downloadJson').addEventListener('click', downloadJson);
+    document.getElementById('downloadCsv').addEventListener('click', downloadCsv);
+    document.getElementById('downloadIcs').addEventListener('click', downloadIcs);
+    document.getElementById('downloadPng').addEventListener('click', downloadPng);
+    document.getElementById('printPdf').addEventListener('click', () => window.print());
+    document.getElementById('clearRows').addEventListener('click', clearRows);
+
+    window.addEventListener('resize', () => { refreshTextareas(); fitTableLayout(); });
+    initMonthSelect();
+    refreshTransportSelects();
+    buildTable(false);
+    loadSavedMonthIfExists();
+    requestAnimationFrame(() => { refreshTextareas(); fitTableLayout(); });
+  </script>
+</body>
+</html>
