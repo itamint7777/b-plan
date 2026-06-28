@@ -4,11 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>B-Plan</title>
+  <link rel="icon" type="image/png" href="b-plan-icon.png" />
+  <link rel="apple-touch-icon" href="b-plan-icon.png" />
   <style>
     :root {
       --bg: #f5f7fb;
       --row-h: 7.0mm;
       --row-h-print: 6.8mm;
+      --sheet-scale: 1;
       --card: #ffffff;
       --ink: #172033;
       --muted: #64748b;
@@ -34,18 +37,34 @@
       padding: 18px;
     }
     header.app-header {
-      background: linear-gradient(135deg, #1d4ed8, #60a5fa);
-      color: white;
+      background: #ffffff;
+      color: var(--ink);
       border-radius: 18px;
-      padding: 18px 20px;
-      box-shadow: 0 10px 24px rgba(37, 99, 235, .18);
+      padding: 14px 18px;
+      box-shadow: 0 10px 24px rgba(37, 99, 235, .12);
       margin-bottom: 16px;
+      border: 1px solid #e2e8f0;
     }
-    header h1 { margin: 0 0 6px; font-size: 1.45rem; }
-    header p { margin: 0; opacity: .92; }
+    .brand-logo {
+      display: block;
+      width: min(760px, 100%);
+      height: auto;
+      margin: 0 auto;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 0;
+      line-height: 0;
+    }
+    header p {
+      margin: 6px 0 0;
+      text-align: center;
+      color: #334155;
+      font-size: .9rem;
+    }
     header .powered {
-      font-size: .88rem;
-      opacity: .86;
+      font-size: .82rem;
+      opacity: .82;
       letter-spacing: .04em;
     }
     .layout {
@@ -148,7 +167,19 @@
     .legend .vacation { background: var(--vacation); }
 
     .sheet-wrap { padding: 14px; overflow: auto; }
+    .sheet-scaler {
+      width: calc(210mm * var(--sheet-scale));
+      height: calc(297mm * var(--sheet-scale));
+      margin: 0 auto;
+      position: relative;
+      transition: width .15s ease, height .15s ease;
+    }
     .sheet {
+      transform: scale(var(--sheet-scale));
+      transform-origin: top left;
+      position: absolute;
+      top: 0;
+      left: 0;
       width: 210mm;
       height: 297mm;
       background: white;
@@ -178,7 +209,7 @@
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
-      font-size: 7.2pt;
+      font-size: 8.2pt;
     }
     .schedule th, .schedule td {
       border: 1px solid #334155;
@@ -236,7 +267,7 @@
       border-left: 1px dotted #94a3b8;
       padding: 1px 2px;
       min-width: 0;
-      font-size: 6.8pt;
+      font-size: 7.8pt;
     }
     .teacher-cell-wrap input:first-child {
       border-left: 0;
@@ -294,7 +325,15 @@
         margin: 0;
         overflow: visible;
       }
+      .sheet-scaler {
+        width: auto;
+        height: auto;
+        margin: 0;
+        position: static;
+      }
       .sheet {
+        transform: none !important;
+        position: static;
         width: 200mm;
         height: 287mm;
         padding: 0;
@@ -307,14 +346,14 @@
       }
       .sheet-title { font-size: 13.5pt; margin-bottom: 3px; }
       .meta { font-size: 7.5pt; margin-bottom: 2px; }
-      table.schedule { font-size: 6.8pt; }
+      table.schedule { font-size: 7.8pt; }
       .schedule th, .schedule td {
         height: var(--row-h-print);
         padding: 0.5px 2px;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      .footer-note { font-size: 6.8pt; margin-top: 2px; }
+      .footer-note { font-size: 7.8pt; margin-top: 2px; }
       .schedule input, .schedule select { color: black; }
     }
   </style>
@@ -323,7 +362,7 @@
   <div class="app">
     <header class="app-header">
       <h1>B-Plan</h1>
-      <p>部活動予定を、もっとかんたんに。<br><span class="powered">Powered by itamint</span></p>
+      <img class="brand-logo" src="b-plan-logo.png" alt="B-Plan 部活動予定を、もっとかんたんに。Powered by itamint" />
     </header>
 
     <div class="layout">
@@ -350,6 +389,20 @@
           <input id="hideTeacher" type="checkbox" />
           指導教員欄を非表示にする
         </label>
+
+        <label for="sheetZoom">表示倍率</label>
+        <div class="row">
+          <select id="sheetZoom">
+            <option value="1">100%</option>
+            <option value="0.9">90%</option>
+            <option value="0.8">80%</option>
+            <option value="0.7">70%</option>
+            <option value="0.6">60%</option>
+            <option value="0.5">50%</option>
+          </select>
+          <button id="fitToScreen" class="secondary" type="button">画面幅</button>
+        </div>
+        <p class="hint">スマホやタブレットで全体を見たい時に使います。印刷・PDFには影響しません。</p>
 
         <div class="legend">
           <span class="sat">土曜</span>
@@ -420,6 +473,7 @@ JR
             <button id="downloadPng">PNG出力</button>
             <button id="printPdf" class="warn">PDF/印刷</button>
             <button id="downloadCsv">CSV出力</button>
+            <button id="downloadXlsx">Excel出力</button>
             <button id="downloadIcs">TimeTree用ICS</button>
             <button id="downloadJson" class="secondary">JSON保存</button>
             <button id="clearRows" class="danger">表をクリア</button>
@@ -435,6 +489,7 @@ JR
       </aside>
 
       <main class="sheet-wrap">
+        <div id="sheetScaler" class="sheet-scaler">
         <section id="sheet" class="sheet">
           <h1 id="title" class="sheet-title"></h1>
           <div class="meta">
@@ -471,6 +526,7 @@ JR
             <span></span>
           </div>
         </section>
+        </div>
       </main>
     </div>
   </div>
@@ -491,7 +547,9 @@ JR
       vacationList: document.getElementById('vacationList'),
       transportOptions: document.getElementById('transportOptions'),
       status: document.getElementById('status'),
-      savedMonthSelect: document.getElementById('savedMonthSelect')
+      savedMonthSelect: document.getElementById('savedMonthSelect'),
+      sheetZoom: document.getElementById('sheetZoom'),
+      sheetScaler: document.getElementById('sheetScaler')
     };
 
     const weekdays = ['日','月','火','水','木','金','土'];
@@ -532,7 +590,7 @@ JR
       const footerH = footer.getBoundingClientRect().height;
       const theadH = thead.getBoundingClientRect().height;
 
-      const bottomBlank = mmToPx(20);
+      const bottomBlank = mmToPx(5);
       const extraGap = 4;
       const available = innerHeight - titleH - metaH - footerH - theadH - bottomBlank - extraGap;
       const rowHpx = Math.max(28, available / rows.length);
@@ -554,6 +612,27 @@ JR
 
     function refreshTextareas() {
       document.querySelectorAll('#tbody textarea').forEach(el => autoResizeTextarea(el));
+    }
+
+    function setSheetZoom(scale) {
+      scale = Math.max(0.35, Math.min(1.2, Number(scale) || 1));
+      document.documentElement.style.setProperty('--sheet-scale', String(scale));
+      if (els.sheetZoom) els.sheetZoom.value = String(scale);
+    }
+
+    function fitSheetToScreen() {
+      const wrap = document.querySelector('.sheet-wrap');
+      if (!wrap) return;
+      const baseWidth = mmToPx(210);
+      const available = Math.max(260, wrap.clientWidth - 28);
+      const scale = Math.min(1, Math.max(0.35, available / baseWidth));
+      const rounded = Math.round(scale * 100) / 100;
+      document.documentElement.style.setProperty('--sheet-scale', String(rounded));
+      if (els.sheetZoom) {
+        const options = [...els.sheetZoom.options].map(o => o.value);
+        if (options.includes(String(rounded))) els.sheetZoom.value = String(rounded);
+        else els.sheetZoom.value = '';
+      }
     }
 
     function initMonthSelect() {
@@ -941,6 +1020,177 @@ JR
       const csv = '\ufeff' + rows.map(r => r.map(csvCell).join(',')).join('\n');
       download(`${els.clubName.value}_${els.year.value}-${pad(els.month.value)}_予定表.csv`, csv, 'text/csv;charset=utf-8');
     }
+    function xmlEscape(value) {
+      return String(value ?? '').replace(/[<>&'"]/g, ch => ({
+        '<':'&lt;', '>':'&gt;', '&':'&amp;', "'":'&apos;', '"':'&quot;'
+      }[ch]));
+    }
+
+    function excelColName(n) {
+      let s = '';
+      while (n > 0) {
+        const m = (n - 1) % 26;
+        s = String.fromCharCode(65 + m) + s;
+        n = Math.floor((n - 1) / 26);
+      }
+      return s;
+    }
+
+    function sheetXmlCell(row, col, value, style = 0) {
+      const ref = `${excelColName(col)}${row}`;
+      const sAttr = style ? ` s="${style}"` : '';
+      return `<c r="${ref}" t="inlineStr"${sAttr}><is><t>${xmlEscape(value)}</t></is></c>`;
+    }
+
+    function makeWorksheetXml(rows) {
+      const colWidths = [7, 7, 8, 8, 14, 14, 34, 18];
+      const cols = '<cols>' + colWidths.map((w, i) => `<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('') + '</cols>';
+      const sheetData = rows.map((row, rIdx) => {
+        const rn = rIdx + 1;
+        const ht = rn === 1 ? 24 : (rn === 2 ? 18 : 28);
+        const cells = row.map((cell, cIdx) => sheetXmlCell(rn, cIdx + 1, cell.value ?? cell, cell.style ?? 0)).join('');
+        return `<row r="${rn}" ht="${ht}" customHeight="1">${cells}</row>`;
+      }).join('');
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+${cols}
+<sheetData>${sheetData}</sheetData>
+<mergeCells count="1"><mergeCell ref="A1:H1"/></mergeCells>
+<pageMargins left="0.25" right="0.25" top="0.35" bottom="0.25" header="0.1" footer="0.1"/>
+<pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="1"/>
+</worksheet>`;
+    }
+
+    function makeXlsxStylesXml() {
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="3">
+<font><sz val="10"/><name val="Yu Gothic"/></font>
+<font><b/><sz val="15"/><name val="Yu Gothic"/></font>
+<font><b/><sz val="10"/><name val="Yu Gothic"/></font>
+</fonts>
+<fills count="4">
+<fill><patternFill patternType="none"/></fill>
+<fill><patternFill patternType="gray125"/></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFE0F2FE"/><bgColor indexed="64"/></patternFill></fill>
+</fills>
+<borders count="2">
+<border><left/><right/><top/><bottom/><diagonal/></border>
+<border><left style="thin"><color rgb="FF334155"/></left><right style="thin"><color rgb="FF334155"/></right><top style="thin"><color rgb="FF334155"/></top><bottom style="thin"><color rgb="FF334155"/></bottom><diagonal/></border>
+</borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="5">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+    }
+
+    function crc32(str) {
+      const table = crc32.table || (crc32.table = (() => {
+        const t = [];
+        for (let n = 0; n < 256; n++) {
+          let c = n;
+          for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+          t[n] = c >>> 0;
+        }
+        return t;
+      })());
+      let crc = 0 ^ -1;
+      for (let i = 0; i < str.length; i++) {
+        const code = str.charCodeAt(i);
+        if (code < 0x80) {
+          crc = (crc >>> 8) ^ table[(crc ^ code) & 0xff];
+        } else {
+          const bytes = new TextEncoder().encode(str[i]);
+          for (const b of bytes) crc = (crc >>> 8) ^ table[(crc ^ b) & 0xff];
+        }
+      }
+      return (crc ^ -1) >>> 0;
+    }
+
+    function makeZip(files) {
+      const encoder = new TextEncoder();
+      const chunks = [];
+      const central = [];
+      let offset = 0;
+      const writeU16 = (arr, n) => { arr.push(n & 255, (n >>> 8) & 255); };
+      const writeU32 = (arr, n) => { arr.push(n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255); };
+
+      files.forEach(file => {
+        const nameBytes = encoder.encode(file.name);
+        const dataBytes = encoder.encode(file.content);
+        const crc = crc32(file.content);
+        const local = [];
+        writeU32(local, 0x04034b50);
+        writeU16(local, 20); writeU16(local, 0); writeU16(local, 0);
+        writeU16(local, 0); writeU16(local, 0);
+        writeU32(local, crc);
+        writeU32(local, dataBytes.length); writeU32(local, dataBytes.length);
+        writeU16(local, nameBytes.length); writeU16(local, 0);
+        chunks.push(new Uint8Array(local), nameBytes, dataBytes);
+
+        const cent = [];
+        writeU32(cent, 0x02014b50);
+        writeU16(cent, 20); writeU16(cent, 20); writeU16(cent, 0); writeU16(cent, 0);
+        writeU16(cent, 0); writeU16(cent, 0);
+        writeU32(cent, crc);
+        writeU32(cent, dataBytes.length); writeU32(cent, dataBytes.length);
+        writeU16(cent, nameBytes.length); writeU16(cent, 0); writeU16(cent, 0);
+        writeU16(cent, 0); writeU16(cent, 0); writeU32(cent, 0);
+        writeU32(cent, offset);
+        central.push(new Uint8Array(cent), nameBytes);
+        offset += local.length + nameBytes.length + dataBytes.length;
+      });
+
+      const centralStart = offset;
+      const centralSize = central.reduce((sum, a) => sum + a.length, 0);
+      const end = [];
+      writeU32(end, 0x06054b50);
+      writeU16(end, 0); writeU16(end, 0);
+      writeU16(end, files.length); writeU16(end, files.length);
+      writeU32(end, centralSize); writeU32(end, centralStart);
+      writeU16(end, 0);
+      return new Blob([...chunks, ...central, new Uint8Array(end)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    }
+
+    function downloadXlsx() {
+      const headers = ['日付','曜日','開始','終了','場所','交通手段','活動内容','指導教員'];
+      const rows = [
+        headers.map((_, i) => ({ value: i === 0 ? els.title.textContent : '', style: 1 })),
+        headers.map(h => ({ value: h, style: 2 }))
+      ];
+      getScheduleRowsForExport().forEach(r => {
+        rows.push([
+          { value: r.day, style: 3 },
+          { value: r.week, style: 3 },
+          { value: r.start, style: 3 },
+          { value: r.end, style: 3 },
+          { value: r.place, style: 4 },
+          { value: r.transport, style: 4 },
+          { value: r.note, style: 4 },
+          { value: r.teachers, style: 4 }
+        ]);
+      });
+      const worksheet = makeWorksheetXml(rows);
+      const files = [
+        { name: '[Content_Types].xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
+        { name: '_rels/.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+        { name: 'xl/workbook.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="予定表" sheetId="1" r:id="rId1"/></sheets></workbook>` },
+        { name: 'xl/_rels/workbook.xml.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+        { name: 'xl/worksheets/sheet1.xml', content: worksheet },
+        { name: 'xl/styles.xml', content: makeXlsxStylesXml() }
+      ];
+      const blob = makeZip(files);
+      download(`${els.clubName.value}_${els.year.value}-${pad(els.month.value)}_予定表.xlsx`, blob, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      showStatus('Excelファイルを出力しました。');
+    }
+
 
     function toIcsDateTime(dateStr, timeStr) {
       const t = timeStr || '00:00';
@@ -1075,7 +1325,7 @@ JR
         const titleH = 38;
         const metaH = 20;
         const footerH = 24;
-        const bottomBlank = Math.round(20 / 25.4 * 150);
+        const bottomBlank = Math.round(5 / 25.4 * 150);
         const tableX = margin;
         const tableY = margin + titleH + metaH;
         const tableW = width - margin * 2;
@@ -1211,17 +1461,24 @@ JR
     document.getElementById('loadLocal').addEventListener('click', loadLocal);
     document.getElementById('downloadJson').addEventListener('click', downloadJson);
     document.getElementById('downloadCsv').addEventListener('click', downloadCsv);
+    document.getElementById('downloadXlsx').addEventListener('click', downloadXlsx);
     document.getElementById('downloadIcs').addEventListener('click', downloadIcs);
     document.getElementById('downloadPng').addEventListener('click', downloadPng);
     document.getElementById('printPdf').addEventListener('click', () => window.print());
     document.getElementById('clearRows').addEventListener('click', clearRows);
+    document.getElementById('sheetZoom').addEventListener('change', e => setSheetZoom(e.target.value));
+    document.getElementById('fitToScreen').addEventListener('click', fitSheetToScreen);
 
     window.addEventListener('resize', () => { refreshTextareas(); fitTableLayout(); });
     initMonthSelect();
     refreshTransportSelects();
     buildTable(false);
     loadSavedMonthIfExists();
-    requestAnimationFrame(() => { refreshTextareas(); fitTableLayout(); });
+    requestAnimationFrame(() => {
+      refreshTextareas();
+      fitTableLayout();
+      if (window.innerWidth < 900) fitSheetToScreen();
+    });
   </script>
 </body>
 </html>
