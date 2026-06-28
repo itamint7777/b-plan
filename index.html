@@ -163,7 +163,7 @@
     }
     .legend .sat { background: var(--sat); }
     .legend .sun { background: var(--sun); }
-    .legend .holiday { background: var(--holiday); }
+    .legend .holiday { background: var(--sun); }
     .legend .vacation { background: var(--vacation); }
 
     .sheet-wrap { padding: 14px; overflow: auto; }
@@ -225,6 +225,12 @@
       font-weight: 900;
     }
     .schedule td:nth-child(1), .schedule td:nth-child(2) { text-align: center; }
+    .print-value {
+      display: inline-block;
+      width: 100%;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
     .schedule input, .schedule select, .schedule textarea {
       width: 100%;
       border: 0;
@@ -280,7 +286,12 @@
     tr.sun td { background: var(--sun); }
     tr.holiday td { background: var(--holiday); }
     tr.vacation td { background: var(--vacation); }
-    tr.holiday.vacation td { background: linear-gradient(90deg, var(--holiday), var(--vacation)); }
+    tr.holiday.vacation td { background: var(--sun); }
+
+    /* 色の優先順位：日曜・祝日 ＞ 土曜 ＞ 長期休業 */
+    tr.vacation td { background: var(--vacation); }
+    tr.sat td, tr.sat.vacation td { background: var(--sat); }
+    tr.sun td, tr.sun.vacation td, tr.holiday td, tr.holiday.vacation td { background: var(--sun); }
     .footer-note {
       margin-top: 3px;
       font-size: 7.2pt;
@@ -354,7 +365,7 @@
         print-color-adjust: exact;
       }
       .footer-note { font-size: 7.8pt; margin-top: 2px; }
-      .schedule input, .schedule select { color: black; }
+      .schedule input, .schedule select, .schedule textarea, .print-value { color: black; }
     }
   </style>
 </head>
@@ -384,6 +395,9 @@
 
         <label for="schoolName">学校名・発行者メモ</label>
         <input id="schoolName" value="鴨川市立安房東中学校" />
+
+        <label for="teacherMessage">先生より</label>
+        <textarea id="teacherMessage" placeholder="例：暑い日が続きます。水分を多めに持参してください。"></textarea>
 
         <label class="check">
           <input id="hideTeacher" type="checkbox" />
@@ -468,8 +482,8 @@ JR
         <div class="group">
           <h2>出力・保存</h2>
           <div class="buttons">
-            <button id="saveLocal" class="good">端末保存</button>
-            <button id="loadLocal" class="secondary">読込</button>
+            <button id="saveLocal" class="good">JSON保存</button>
+            <button id="loadLocal" class="secondary">JSON/Excel読込</button>
             <button id="downloadPng">PNG出力</button>
             <button id="printPdf" class="warn">PDF/印刷</button>
             <button id="downloadCsv">CSV出力</button>
@@ -478,11 +492,8 @@ JR
             <button id="downloadJson" class="secondary">JSON保存</button>
             <button id="clearRows" class="danger">表をクリア</button>
           </div>
-          <label for="savedMonthSelect">保存済み予定を開く</label>
-          <select id="savedMonthSelect">
-            <option value="">保存済みの月を選択</option>
-          </select>
-          <p class="hint">「端末保存」で、同じ年の1月〜12月分をこのブラウザに保存できます。保存後は再度HTMLを開いても読み込めます。</p>
+          <input id="importFile" type="file" accept=".json,.xlsx" style="display:none;">
+          <p class="hint">「JSON保存」でデータファイルをダウンロードします。読み込みは、保存したJSONまたはこのアプリで出力したExcelを選択できます。</p>
           <p class="hint">OneDriveへは、出力したPNG/PDF/CSV/ICS/JSONをOneDriveフォルダに保存してください。Microsoftアカウント直結は、Azureアプリ登録後に追加可能です。</p>
           <div id="status" class="status"></div>
         </div>
@@ -525,6 +536,10 @@ JR
             <span>※予定は変更になる場合があります。変更時は別途連絡します。</span>
             <span></span>
           </div>
+          <div class="teacher-message-box">
+            <div class="teacher-message-label">先生より</div>
+            <div id="teacherMessagePreview" class="teacher-message-preview"></div>
+          </div>
         </section>
         </div>
       </main>
@@ -537,6 +552,8 @@ JR
       year: document.getElementById('year'),
       month: document.getElementById('month'),
       schoolName: document.getElementById('schoolName'),
+      teacherMessage: document.getElementById('teacherMessage'),
+      teacherMessagePreview: document.getElementById('teacherMessagePreview'),
       hideTeacher: document.getElementById('hideTeacher'),
       title: document.getElementById('title'),
       schoolMeta: document.getElementById('schoolMeta'),
@@ -547,7 +564,7 @@ JR
       vacationList: document.getElementById('vacationList'),
       transportOptions: document.getElementById('transportOptions'),
       status: document.getElementById('status'),
-      savedMonthSelect: document.getElementById('savedMonthSelect'),
+      importFile: document.getElementById('importFile'),
       sheetZoom: document.getElementById('sheetZoom'),
       sheetScaler: document.getElementById('sheetScaler')
     };
@@ -576,9 +593,10 @@ JR
       const title = els.title;
       const meta = sheet ? sheet.querySelector('.meta') : null;
       const footer = sheet ? sheet.querySelector('.footer-note') : null;
+      const teacherBox = sheet ? sheet.querySelector('.teacher-message-box') : null;
       const thead = table ? table.querySelector('thead') : null;
       const rows = table ? [...table.querySelectorAll('tbody tr')] : [];
-      if (!sheet || !table || !title || !meta || !footer || !thead || rows.length === 0) return;
+      if (!sheet || !table || !title || !meta || !footer || !teacherBox || !thead || rows.length === 0) return;
 
       const sheetStyle = getComputedStyle(sheet);
       const padTop = parseFloat(sheetStyle.paddingTop) || 0;
@@ -588,11 +606,12 @@ JR
       const titleH = title.getBoundingClientRect().height;
       const metaH = meta.getBoundingClientRect().height;
       const footerH = footer.getBoundingClientRect().height;
+      const teacherBoxH = teacherBox.getBoundingClientRect().height;
       const theadH = thead.getBoundingClientRect().height;
 
       const bottomBlank = mmToPx(5);
       const extraGap = 4;
-      const available = innerHeight - titleH - metaH - footerH - theadH - bottomBlank - extraGap;
+      const available = innerHeight - titleH - metaH - footerH - teacherBoxH - theadH - bottomBlank - extraGap;
       const rowHpx = Math.max(28, available / rows.length);
 
       sheet.style.setProperty('--row-h', `${rowHpx}px`);
@@ -612,6 +631,39 @@ JR
 
     function refreshTextareas() {
       document.querySelectorAll('#tbody textarea').forEach(el => autoResizeTextarea(el));
+    }
+
+    function applyRowRules(tr, sourceField = '') {
+      if (!tr) return;
+      const startEl = tr.querySelector('[data-field="start"]');
+      const endEl = tr.querySelector('[data-field="end"]');
+      const placeEl = tr.querySelector('[data-field="place"]');
+      const transportEl = tr.querySelector('[data-field="transport"]');
+      const start = (startEl?.value || '').trim();
+      const end = (endEl?.value || '').trim();
+
+      if (start === '×' || start === '✕' || start === 'x' || start === 'X') {
+        if (placeEl) {
+          placeEl.value = '部活動なし';
+          autoResizeTextarea(placeEl);
+        }
+        if (endEl && sourceField === 'start') endEl.value = '';
+        if (transportEl && sourceField === 'start') {
+          transportEl.value = '';
+          autoResizeTextarea(transportEl);
+        }
+        return;
+      }
+      if (!start && !end) {
+        if (placeEl) {
+          placeEl.value = '';
+          autoResizeTextarea(placeEl);
+        }
+      }
+    }
+
+    function applyAllRowRules() {
+      document.querySelectorAll('#tbody tr').forEach(tr => applyRowRules(tr));
     }
 
     function setSheetZoom(scale) {
@@ -784,6 +836,7 @@ JR
       els.title.textContent = `${club}部${month}月部活動予定表`;
       els.schoolMeta.textContent = els.schoolName.value;
       els.createdMeta.textContent = `作成：${ymd(new Date())}`;
+      if (els.teacherMessagePreview) els.teacherMessagePreview.textContent = els.teacherMessage.value || '';
       const vacNames = [...new Set(parseVacations().map(v => v.name))];
       if (els.vacMeta) els.vacMeta.textContent = '';
 
@@ -842,6 +895,7 @@ JR
       }
       updateTeacherVisibility();
       requestAnimationFrame(() => {
+        applyAllRowRules();
         refreshTextareas();
         fitTableLayout();
       });
@@ -889,6 +943,7 @@ JR
         year: Number(els.year.value),
         month: Number(els.month.value),
         schoolName: els.schoolName.value,
+        teacherMessage: els.teacherMessage.value,
         hideTeacher: els.hideTeacher.checked,
         vacationList: els.vacationList.value,
         transportOptions: els.transportOptions.value,
@@ -902,6 +957,7 @@ JR
       els.year.value = data.year || els.year.value;
       els.month.value = data.month || els.month.value;
       els.schoolName.value = data.schoolName || els.schoolName.value;
+      if (data.teacherMessage !== undefined) els.teacherMessage.value = data.teacherMessage || '';
       els.hideTeacher.checked = !!data.hideTeacher;
       els.vacationList.value = data.vacationList || els.vacationList.value;
       if (data.transportOptions) els.transportOptions.value = data.transportOptions;
@@ -920,73 +976,38 @@ JR
     }
 
     function readYearArchive(year = els.year.value, club = els.clubName.value) {
-      try {
-        return JSON.parse(localStorage.getItem(storageKey(year, club)) || '{}');
-      } catch (e) {
-        return {};
-      }
+      return {};
     }
 
     function writeYearArchive(archive, year = els.year.value, club = els.clubName.value) {
-      localStorage.setItem(storageKey(year, club), JSON.stringify(archive));
+      // ファイル保存方式に変更したため、ブラウザ内保存は使用しません。
     }
 
     function saveCurrentMonthToArchive(silent = true) {
-      try {
-        const data = collectData();
-        const archive = readYearArchive(data.year, data.clubName);
-        archive.version = '2.1';
-        archive.clubName = data.clubName;
-        archive.year = data.year;
-        archive.schoolName = data.schoolName;
-        archive.hideTeacher = data.hideTeacher;
-        archive.vacationList = data.vacationList;
-        archive.transportOptions = data.transportOptions;
-        archive.months = archive.months || {};
-        archive.months[String(data.month)] = data;
-        archive.updatedAt = new Date().toISOString();
-        writeYearArchive(archive, data.year, data.clubName);
-        updateSavedMonthSelect();
-        if (!silent) showStatus(`${data.year}年${data.month}月分を保存しました。1年分の保存枠に追加されています。`);
-      } catch (e) {
-        if (!silent) showStatus('保存に失敗しました。ブラウザの保存容量や設定を確認してください。');
-      }
+      // 入力中の自動保存はしません。保存はJSON保存ボタンでダウンロードします。
     }
 
     function autosave() {
-      saveCurrentMonthToArchive(true);
+      // 自動保存なし
     }
 
     function saveLocal() {
-      saveCurrentMonthToArchive(false);
+      const data = collectData();
+      const name = `${data.clubName}_${data.year}-${pad(data.month)}_B-Plan保存データ.json`;
+      download(name, JSON.stringify(data, null, 2), 'application/json;charset=utf-8');
+      showStatus('JSON保存データをダウンロードしました。');
     }
 
-    function loadLocal(monthValue = els.month.value) {
-      const archive = readYearArchive(els.year.value, els.clubName.value);
-      const data = archive.months && archive.months[String(monthValue)];
-      if (!data) return showStatus('この年・部活動名の保存データは見つかりません。');
-      restoreData(data);
-      showStatus(`${data.year}年${data.month}月分を読み込みました。`);
+    function loadLocal() {
+      if (els.importFile) els.importFile.click();
     }
 
     function updateSavedMonthSelect() {
-      if (!els.savedMonthSelect) return;
-      const archive = readYearArchive(els.year.value, els.clubName.value);
-      const months = archive.months ? Object.keys(archive.months).map(Number).sort((a,b) => a-b) : [];
-      const current = els.savedMonthSelect.value;
-      els.savedMonthSelect.innerHTML = '<option value="">保存済みの月を選択</option>' +
-        months.map(m => `<option value="${m}">${els.year.value}年${m}月</option>`).join('');
-      if (months.map(String).includes(current)) els.savedMonthSelect.value = current;
+      // ファイル読込方式に変更
     }
 
     function loadSavedMonthIfExists() {
-      const archive = readYearArchive(els.year.value, els.clubName.value);
-      const data = archive.months && archive.months[String(els.month.value)];
-      if (data) {
-        restoreData(data);
-        showStatus(`${data.year}年${data.month}月分の保存データを自動で読み込みました。`);
-      }
-      updateSavedMonthSelect();
+      // ファイル読込方式に変更
     }
 
     function download(filename, content, type) {
@@ -999,6 +1020,121 @@ JR
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+    }
+
+    function parseXmlText(text) {
+      const doc = new DOMParser().parseFromString(text, 'application/xml');
+      if (doc.querySelector('parsererror')) throw new Error('XMLの解析に失敗しました。');
+      return doc;
+    }
+
+    async function importJsonFile(file) {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      restoreData(data);
+      applyAllRowRules();
+      showStatus('JSONデータを読み込みました。');
+    }
+
+    function readZipEntriesStored(buffer) {
+      const bytes = new Uint8Array(buffer);
+      const dec = new TextDecoder('utf-8');
+      const entries = {};
+      let p = 0;
+      while (p < bytes.length - 30) {
+        const sig = bytes[p] | (bytes[p+1] << 8) | (bytes[p+2] << 16) | (bytes[p+3] << 24);
+        if (sig !== 0x04034b50) { p++; continue; }
+        const method = bytes[p+8] | (bytes[p+9] << 8);
+        const compSize = bytes[p+18] | (bytes[p+19] << 8) | (bytes[p+20] << 16) | (bytes[p+21] << 24);
+        const nameLen = bytes[p+26] | (bytes[p+27] << 8);
+        const extraLen = bytes[p+28] | (bytes[p+29] << 8);
+        const nameStart = p + 30;
+        const name = dec.decode(bytes.slice(nameStart, nameStart + nameLen));
+        const dataStart = nameStart + nameLen + extraLen;
+        const dataEnd = dataStart + compSize;
+        if (method === 0 && dataEnd <= bytes.length) entries[name] = dec.decode(bytes.slice(dataStart, dataEnd));
+        p = dataEnd;
+      }
+      return entries;
+    }
+
+    function cellRefToCol(ref) {
+      const letters = ref.replace(/[0-9]/g, '');
+      let n = 0;
+      for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64);
+      return n;
+    }
+
+    function parseWorksheetRows(xmlText) {
+      const doc = parseXmlText(xmlText);
+      const rows = [];
+      doc.querySelectorAll('sheetData row').forEach(rowEl => {
+        const row = [];
+        rowEl.querySelectorAll('c').forEach(c => {
+          const ref = c.getAttribute('r') || '';
+          const col = cellRefToCol(ref) - 1;
+          const t = c.querySelector('is t');
+          row[col] = t ? t.textContent : '';
+        });
+        rows.push(row);
+      });
+      return rows;
+    }
+
+    async function importXlsxFile(file) {
+      const buffer = await file.arrayBuffer();
+      const entries = readZipEntriesStored(buffer);
+      const sheetXml = entries['xl/worksheets/sheet1.xml'];
+      if (!sheetXml) throw new Error('このExcelファイルは読み込めません。このアプリで出力したExcelを使用してください。');
+      const rows = parseWorksheetRows(sheetXml);
+      const title = rows[0]?.[0] || '';
+      const body = rows.slice(2);
+      const data = collectData();
+
+      const m = title.match(/(.+)部(\d+)月部活動予定表/);
+      if (m) {
+        data.clubName = m[1];
+        data.month = Number(m[2]);
+      }
+
+      data.rows = {};
+      const year = Number(data.year);
+      const month = Number(data.month);
+      body.forEach(r => {
+        const day = Number(r[0]);
+        if (!day) return;
+        const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+        const teachers = String(r[7] || '').split('・');
+        data.rows[dateStr] = {
+          start: r[2] || '',
+          end: r[3] || '',
+          place: r[4] || '',
+          transport: r[5] || '',
+          note: r[6] || '',
+          teacher1: teachers[0] || '',
+          teacher2: teachers[1] || '',
+          teacher3: teachers[2] || ''
+        };
+      });
+      const teacherRow = rows.find(r => r[0] === '先生より');
+      if (teacherRow) data.teacherMessage = teacherRow[1] || '';
+      restoreData(data);
+      applyAllRowRules();
+      showStatus('Excelデータを読み込みました。');
+    }
+
+    async function handleImportFile(file) {
+      if (!file) return;
+      try {
+        if (file.name.toLowerCase().endsWith('.json')) await importJsonFile(file);
+        else if (file.name.toLowerCase().endsWith('.xlsx')) await importXlsxFile(file);
+        else showStatus('JSONまたはExcelファイルを選択してください。');
+      } catch (e) {
+        console.error(e);
+        showStatus(e.message || '読み込みに失敗しました。');
+      } finally {
+        if (els.importFile) els.importFile.value = '';
+      }
     }
 
     function downloadJson() {
@@ -1065,27 +1201,39 @@ ${cols}
       return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <fonts count="3">
-<font><sz val="10"/><name val="Yu Gothic"/></font>
+<font><sz val="11"/><name val="Yu Gothic"/></font>
 <font><b/><sz val="15"/><name val="Yu Gothic"/></font>
-<font><b/><sz val="10"/><name val="Yu Gothic"/></font>
+<font><b/><sz val="11"/><name val="Yu Gothic"/></font>
 </fonts>
-<fills count="4">
+<fills count="8">
 <fill><patternFill patternType="none"/></fill>
 <fill><patternFill patternType="gray125"/></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFE0F2FE"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFEE2E2"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFFEDD5"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFDCFCE7"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/><bgColor indexed="64"/></patternFill></fill>
 </fills>
 <borders count="2">
 <border><left/><right/><top/><bottom/><diagonal/></border>
 <border><left style="thin"><color rgb="FF334155"/></left><right style="thin"><color rgb="FF334155"/></right><top style="thin"><color rgb="FF334155"/></top><bottom style="thin"><color rgb="FF334155"/></bottom><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="5">
+<cellXfs count="13">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 <xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="7" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="7" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
@@ -1166,17 +1314,27 @@ ${cols}
         headers.map(h => ({ value: h, style: 2 }))
       ];
       getScheduleRowsForExport().forEach(r => {
+        let centerStyle = 3;
+        let leftStyle = 4;
+        if (r.cls.includes('sun') || r.cls.includes('holiday')) { centerStyle = 7; leftStyle = 8; }
+        else if (r.cls.includes('sat')) { centerStyle = 5; leftStyle = 6; }
+        else if (r.cls.includes('vacation')) { centerStyle = 11; leftStyle = 12; }
         rows.push([
-          { value: r.day, style: 3 },
-          { value: r.week, style: 3 },
-          { value: r.start, style: 3 },
-          { value: r.end, style: 3 },
-          { value: r.place, style: 4 },
-          { value: r.transport, style: 4 },
-          { value: r.note, style: 4 },
-          { value: r.teachers, style: 4 }
+          { value: r.day, style: centerStyle },
+          { value: r.week, style: centerStyle },
+          { value: r.start, style: centerStyle },
+          { value: r.end, style: centerStyle },
+          { value: r.place, style: leftStyle },
+          { value: r.transport, style: leftStyle },
+          { value: r.note, style: leftStyle },
+          { value: r.teachers, style: leftStyle }
         ]);
       });
+      rows.push([
+        { value: '先生より', style: 2 },
+        { value: els.teacherMessage.value || '', style: 4 },
+        { value: '', style: 4 }, { value: '', style: 4 }, { value: '', style: 4 }, { value: '', style: 4 }, { value: '', style: 4 }, { value: '', style: 4 }
+      ]);
       const worksheet = makeWorksheetXml(rows);
       const files = [
         { name: '[Content_Types].xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
@@ -1289,7 +1447,7 @@ ${cols}
           day: tr.children[0].textContent,
           week: tr.children[1].textContent,
           start: inputs.start || '',
-          end: inputs.end || '',
+          end: (inputs.start ? (inputs.end || '') : ''),
           place: inputs.place || '',
           transport: inputs.transport || '',
           note: inputs.note || '',
@@ -1300,10 +1458,9 @@ ${cols}
     }
 
     function rowBgColor(cls) {
-      if (cls.includes('holiday')) return '#ffedd5';
-      if (cls.includes('vacation')) return '#dcfce7';
-      if (cls.includes('sun')) return '#fee2e2';
+      if (cls.includes('sun') || cls.includes('holiday')) return '#fee2e2';
       if (cls.includes('sat')) return '#e0f2fe';
+      if (cls.includes('vacation')) return '#dcfce7';
       return '#ffffff';
     }
 
@@ -1325,13 +1482,14 @@ ${cols}
         const titleH = 38;
         const metaH = 20;
         const footerH = 24;
+        const teacherBoxH = 70;
         const bottomBlank = Math.round(5 / 25.4 * 150);
         const tableX = margin;
         const tableY = margin + titleH + metaH;
         const tableW = width - margin * 2;
         const rows = getScheduleRowsForExport();
         const headerH = 28;
-        const rowH = Math.max(28, Math.floor((height - tableY - footerH - bottomBlank - margin - headerH) / rows.length));
+        const rowH = Math.max(28, Math.floor((height - tableY - footerH - teacherBoxH - bottomBlank - margin - headerH) / rows.length));
         const tableH = headerH + rowH * rows.length;
 
         ctx.fillStyle = '#172033';
@@ -1394,10 +1552,29 @@ ${cols}
           });
         });
 
+        const footerY = tableY + tableH + 10;
         ctx.fillStyle = '#475569';
         ctx.font = '14px "Noto Sans JP", sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText('※予定は変更になる場合があります。変更時は別途連絡します。', margin, height - bottomBlank + 10);
+        ctx.fillText('※予定は変更になる場合があります。変更時は別途連絡します。', margin, footerY);
+
+        const boxY = footerY + 12;
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1.3;
+        ctx.strokeRect(margin, boxY, width - margin * 2, teacherBoxH);
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(margin, boxY, 110, teacherBoxH);
+        ctx.strokeRect(margin, boxY, 110, teacherBoxH);
+        ctx.fillStyle = '#172033';
+        ctx.font = 'bold 14px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('先生より', margin + 55, boxY + teacherBoxH / 2);
+        ctx.fillStyle = '#172033';
+        ctx.font = '14px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        wrapText(ctx, els.teacherMessage.value || '', margin + 122, boxY + 22, width - margin * 2 - 135, 17, 3);
 
         const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
         if (!blob) throw new Error('PNG変換に失敗しました。');
@@ -1417,7 +1594,7 @@ ${cols}
     }
 
     document.addEventListener('input', e => {
-      if (['schoolName','vacationList'].includes(e.target.id)) buildTable(true);
+      if (['schoolName','teacherMessage','vacationList'].includes(e.target.id)) buildTable(true);
       if (e.target.id === 'clubName' || e.target.id === 'year') {
         buildTable(true);
         updateSavedMonthSelect();
@@ -1435,10 +1612,8 @@ ${cols}
         buildTable(false);
         loadSavedMonthIfExists();
       }
-      if (e.target.id === 'savedMonthSelect' && e.target.value) {
-        els.month.value = e.target.value;
-        buildTable(false);
-        loadLocal(e.target.value);
+      if (e.target.id === 'importFile') {
+        handleImportFile(e.target.files && e.target.files[0]);
       }
     });
 
@@ -1459,15 +1634,62 @@ ${cols}
     document.getElementById('applyAll').addEventListener('click', () => applyBulk('all'));
     document.getElementById('saveLocal').addEventListener('click', saveLocal);
     document.getElementById('loadLocal').addEventListener('click', loadLocal);
+    document.getElementById('importFile').addEventListener('change', e => handleImportFile(e.target.files && e.target.files[0]));
     document.getElementById('downloadJson').addEventListener('click', downloadJson);
     document.getElementById('downloadCsv').addEventListener('click', downloadCsv);
     document.getElementById('downloadXlsx').addEventListener('click', downloadXlsx);
     document.getElementById('downloadIcs').addEventListener('click', downloadIcs);
     document.getElementById('downloadPng').addEventListener('click', downloadPng);
-    document.getElementById('printPdf').addEventListener('click', () => window.print());
+    function preparePrintDisplay() {
+      document.querySelectorAll('#tbody tr').forEach(tr => {
+        const startControl = tr.querySelector('[data-field="start"]');
+        const endControl = tr.querySelector('[data-field="end"]');
+        const startValue = (startControl?.value || '').trim();
+
+        tr.querySelectorAll('input, textarea, select').forEach(control => {
+          if (control.dataset.printPrepared === '1') return;
+          const field = control.dataset.field || '';
+          let value = (control.value || '').trim();
+
+          // 開始が空欄の場合、終了時刻も印刷時は空欄にする。
+          // ブラウザや入力欄の既定表示で「12:00」等が出るのを防ぐ。
+          if ((field === 'start' || field === 'end') && !startValue) {
+            value = '';
+          }
+
+          // 開始が×の場合は、終了時刻は印刷しない。
+          if (field === 'end' && (startValue === '×' || startValue === '✕' || startValue === 'x' || startValue === 'X')) {
+            value = '';
+          }
+
+          const span = document.createElement('span');
+          span.className = 'print-value';
+          span.dataset.printValueFor = field;
+          span.textContent = value;
+          control.dataset.printPrepared = '1';
+          control.style.display = 'none';
+          control.insertAdjacentElement('afterend', span);
+        });
+      });
+    }
+
+    function restorePrintDisplay() {
+      document.querySelectorAll('.print-value').forEach(span => span.remove());
+      document.querySelectorAll('#tbody input, #tbody textarea, #tbody select').forEach(control => {
+        control.style.display = '';
+        delete control.dataset.printPrepared;
+      });
+    }
+
+    document.getElementById('printPdf').addEventListener('click', () => {
+      preparePrintDisplay();
+      setTimeout(() => window.print(), 50);
+    });
     document.getElementById('clearRows').addEventListener('click', clearRows);
     document.getElementById('sheetZoom').addEventListener('change', e => setSheetZoom(e.target.value));
     document.getElementById('fitToScreen').addEventListener('click', fitSheetToScreen);
+    window.addEventListener('beforeprint', preparePrintDisplay);
+    window.addEventListener('afterprint', restorePrintDisplay);
 
     window.addEventListener('resize', () => { refreshTextareas(); fitTableLayout(); });
     initMonthSelect();
